@@ -1,52 +1,52 @@
 # VQueue.Connector (.NET)
 
-Protección de cola **dentro de la app ASP.NET Core del cliente**. Equivalente
-server-side del JS adapter.
+Queue protection **inside your own ASP.NET Core app**. It is the server-side
+equivalent of the JS adapter.
 
-## Uso
+## Usage
 
 ```csharp
 builder.Services.AddSingleton(new QueueGuard(new QueueGuardOptions
 {
-    Client = "orome",                                        // subdominio
-    PrivateKey = builder.Configuration["VQueue:PrivateKey"]!, // nunca hardcodeada
+    Client = "orome",                                         // your company subdomain
+    PrivateKey = builder.Configuration["VQueue:PrivateKey"]!, // never hardcode it
 }));
 
 var app = builder.Build();
-app.UseVQueue();   // antes de los endpoints que querés proteger
+app.UseVQueue();   // before the endpoints you want to protect
 ```
 
-Sin ASP.NET, el guard se usa directo:
+Without ASP.NET, use the guard directly:
 
 ```csharp
 var decision = await guard.DecideAsync(new QueueRequest(path, query, cookies, method));
 ```
 
-## Qué hace
+## What it does
 
-1. **Bypass barato** — assets, `/api/`, WebSockets y métodos que no son GET/HEAD.
-   Un 302 sobre un POST perdería el body del checkout.
-2. **Vuelta de la cola** — canjea `?vq_token=`, emite `vq_pass_<event_id>` y
-   vuelve al destino original. Un `?token=` propio del sitio no se secuestra.
-3. **ACLs** — por prioridad, primera gana.
-4. **Pase** — verifica el HMAC **offline** con la `private_key`; no llama a
-   VQueue en cada request.
-5. **Renovación deslizante** — resuelta en una sola pasada. Lambda@Edge necesita
-   una segunda función para esto; acá el middleware toca la respuesta antes de
-   que salga.
+1. **Cheap bypass** — assets, `/api/`, WebSockets, and methods other than GET/HEAD.
+   A 302 on a POST would lose the checkout body.
+2. **Return from the queue** — exchanges `?vq_token=`, issues `vq_pass_<event_id>`,
+   and returns to the original destination. Your site's own `?token=` is never
+   hijacked.
+3. **ACLs** — by priority, first match wins.
+4. **Pass** — verifies the HMAC **offline** with the `private_key`; it doesn't call
+   VirtualQueue on every request.
+5. **Sliding renewal** — done in a single pass. Lambda@Edge needs a second function
+   for this; here the middleware touches the response before it goes out.
 
-Todo falla abierto: sin settings, sin API o con config incompleta, el visitante
-pasa.
+Everything fails open: with no settings, no API, or an incomplete config, the
+visitor gets through.
 
-## Configuración
+## Configuration
 
-| Opción | Default | Qué es |
+| Option | Default | What it is |
 |---|---|---|
-| `Client` | — | Subdominio de la compañía en VQueue |
-| `PrivateKey` | — | `private_key`; verifica el pase offline |
-| `AdminHost` | `clients.virtual-queue.com` | De dónde bajar las ACLs |
-| `SettingsTtl` | 30s | Cache de ACLs a nivel proceso |
-| `SecureCookies` | `true` | `false` solo para desarrollo en `http://localhost` |
+| `Client` | — | Your company subdomain in VirtualQueue |
+| `PrivateKey` | — | Your `private_key`; verifies the pass offline |
+| `AdminHost` | `clients.virtual-queue.com` | Where to download the ACLs from |
+| `SettingsTtl` | 30s | Process-level ACL cache |
+| `SecureCookies` | `true` | `false` only for development on `http://localhost` |
 
 ## Tests
 
