@@ -73,7 +73,7 @@ public class QueueMiddlewareTests
     }
 
     [Fact]
-    public async Task Deja_pasar_con_pase_y_renueva_la_cookie()
+    public async Task Deja_pasar_con_pase_sin_tocar_la_respuesta()
     {
         var called = false;
         var middleware = new QueueMiddleware(_ => { called = true; return Task.CompletedTask; }, Guard());
@@ -81,11 +81,9 @@ public class QueueMiddlewareTests
 
         await middleware.InvokeAsync(ctx);
 
+        // El pase no se renueva: ningún Set-Cookie en la respuesta.
         Assert.True(called);
-        var renewed = Assert.Single(ctx.Response.Headers.SetCookie.ToArray());
-        Assert.StartsWith($"vq_pass_ev-42={Pass};", renewed);
-        Assert.Contains("httponly", renewed!, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("secure", renewed!, StringComparison.OrdinalIgnoreCase);
+        Assert.Empty(ctx.Response.Headers.SetCookie.ToArray());
     }
 
     [Fact]

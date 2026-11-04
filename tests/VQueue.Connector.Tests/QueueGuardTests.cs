@@ -94,15 +94,16 @@ public class QueueGuardTests
     }
 
     [Fact]
-    public async Task Deja_pasar_al_que_tiene_pase_valido_y_lo_renueva()
+    public async Task Deja_pasar_al_que_tiene_pase_valido_sin_reescribir_la_cookie()
     {
         var (guard, _) = Guard();
 
         var d = await guard.DecideAsync(Request(cookies: new Dictionary<string, string> { [QueuePass.CookieName("ev-42")] = Pass }));
 
+        // Sin cookies: el pase dura cookie_lifetime desde que se emitió y no se
+        // extiende mientras el visitante navega.
         Assert.Equal(DecisionType.Allow, d.Type);
-        Assert.Equal(Pass, d.Renew!.Value);
-        Assert.Equal(600, d.Renew.MaxAgeSeconds);
+        Assert.Null(d.Cookies);
     }
 
     [Fact]
@@ -228,12 +229,17 @@ public class QueueGuardTests
     [Fact]
     public async Task Un_cookie_lifetime_raro_no_tira_abajo_los_settings()
     {
-        var (guard, _) = Guard(_ => StubHandler.Json(SettingsBody(cookieLifetime: null)));
+        var (guard, _) = Guard(req => req.RequestUri!.AbsolutePath.Contains("/adapter/")
+            ? StubHandler.Json(SettingsBody(cookieLifetime: null))
+            : StubHandler.Json(new { success = true, data = new { event_id = "ev-42", pass = Pass } }));
 
-        var d = await guard.DecideAsync(Request(cookies: new Dictionary<string, string> { [QueuePass.CookieName("ev-42")] = Pass }));
+        // Con cookie_lifetime inválido los settings siguen valiendo y el pase
+        // recién canjeado sale con el default.
+        var d = await guard.DecideAsync(Request(query: new Dictionary<string, string> { ["vq_token"] = Token }));
 
-        Assert.Equal(DecisionType.Allow, d.Type);
-        Assert.Equal(QueueGuard.DefaultCookieLifetime, d.Renew!.MaxAgeSeconds);
+        Assert.Equal(DecisionType.Redirect, d.Type);
+        var pass = Assert.Single(d.Cookies!, c => c.Name == QueuePass.CookieName("ev-42"));
+        Assert.Equal(QueueGuard.DefaultCookieLifetime, pass.MaxAgeSeconds);
     }
 
     [Fact]
