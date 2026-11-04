@@ -32,8 +32,9 @@ var decision = await guard.DecideAsync(new QueueRequest(path, query, cookies, me
 3. **ACLs** — by priority, first match wins.
 4. **Pass** — verifies the HMAC **offline** with the `private_key`; it doesn't call
    VirtualQueue on every request.
-5. **Sliding renewal** — done in a single pass. Lambda@Edge needs a second function
-   for this; here the middleware touches the response before it goes out.
+5. **Fixed budget** — the pass cookie lasts exactly `cookie_lifetime` (10 minutes by
+   default) from the moment the visitor leaves the queue. It is never renewed while
+   they browse: a checkout slower than that goes back to the queue.
 
 Everything fails open: with no settings, no API, or an incomplete config, the
 visitor gets through.

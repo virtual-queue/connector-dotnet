@@ -38,8 +38,7 @@ public sealed record CookieInstruction(string Name, string Value, int MaxAgeSeco
 public sealed record Decision(
     DecisionType Type,
     string? Location = null,
-    IReadOnlyList<CookieInstruction>? Cookies = null,
-    CookieInstruction? Renew = null)
+    IReadOnlyList<CookieInstruction>? Cookies = null)
 {
     public static readonly Decision Bypass = new(DecisionType.Bypass);
     public static readonly Decision Allow = new(DecisionType.Allow);
@@ -177,15 +176,10 @@ public sealed class QueueGuard
         var pass = QueuePass.ValidFor(request.Cookies, rule.EventId, _options.PrivateKey, _clock());
         if (pass.Ok)
         {
-            // Renovación deslizante: mientras el visitante navegue, el pase se
-            // extiende. Sin esto es un presupuesto fijo desde que salió de la fila
-            // y una compra lenta vuelve a la cola a mitad de camino.
-            return new Decision(
-                DecisionType.Allow,
-                Renew: new CookieInstruction(
-                    QueuePass.CookieName(rule.EventId),
-                    request.Cookies[QueuePass.CookieName(rule.EventId)],
-                    settings.CookieLifetime));
+            // El pase no se renueva: la cookie dura exactamente cookie_lifetime
+            // desde que el visitante salió de la fila, siga navegando o no. Es un
+            // presupuesto fijo para comprar; una compra más lenta vuelve a la cola.
+            return Decision.Allow;
         }
 
         _logger?.Log($"[vqueue] sin pase para {rule.EventId} ({pass.Reason}) → cola");

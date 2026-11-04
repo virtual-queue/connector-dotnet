@@ -7,9 +7,9 @@ namespace VQueue.Connector;
 /// Middleware de ASP.NET Core. Traduce el <see cref="HttpContext"/> al request
 /// normalizado del guard y aplica la decisión sobre la respuesta.
 ///
-/// A diferencia de Lambda@Edge, acá la renovación deslizante se resuelve en una
-/// sola pasada: el middleware puede tocar la respuesta antes de que salga, así
-/// que no hace falta una segunda función.
+/// Solo el redirect escribe cookies (el pase recién canjeado, o el destino
+/// guardado). Con allow/bypass la respuesta sigue intacta: el pase no se
+/// renueva, dura cookie_lifetime desde que se emitió.
 /// </summary>
 public sealed class QueueMiddleware
 {
@@ -38,11 +38,6 @@ public sealed class QueueMiddleware
             context.Response.Headers.Location = decision.Location;
             context.Response.Headers.CacheControl = "no-store";
             return;
-        }
-
-        if (decision.Renew is not null)
-        {
-            Append(context.Response, decision.Renew);
         }
 
         await _next(context).ConfigureAwait(false);
